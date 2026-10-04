@@ -70,6 +70,17 @@ if st.button("Mark attendance", type="primary", disabled=not ready):
             result = None
     if result is not None:
         db.save_session([s["id"] for s in roster], list(result["matched"]), subject, period, today)
+
+        try:
+            from core import google_sheet
+            rows = db.session_rows(branch, year, section, today, period)
+            n = google_sheet.sync_attendance(rows, subject, period, today)
+            st.toast(f"✅ {n} rows Google Sheet mein save hui", icon="📊")
+        except FileNotFoundError:
+            st.warning("Google Sheet sync skip — credentials.json nahi mili.")
+        except Exception as e:
+            st.warning(f"Google Sheet sync fail: {e}")
+            
         export_error = None
         try:
             excel_report.export_month_file(branch, year, section, today[:7])
