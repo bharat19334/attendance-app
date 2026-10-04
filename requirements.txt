@@ -1,7 +1,7 @@
 streamlit
-face_recognition
 opencv-python-headless
-dlib
+dlib-bin
+face_recognition_models
 numpy
 pandas
 openpyxl
