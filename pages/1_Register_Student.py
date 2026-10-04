@@ -120,10 +120,4 @@ else:
         hide_index=True,
         width="stretch",
     )
-    with st.expander("Student delete karo"):
-        labels = {f"{s['roll_no']} - {s['name']} ({s['branch']} {s['year']} {s['section']})": s["id"] for s in students}
-        choice = st.selectbox("Student", list(labels), key="del_choice")
-        sure = st.checkbox("Haan, is student ka saara data (attendance bhi) delete karna hai", key="del_sure")
-        if st.button("Delete", disabled=not sure):
-            db.delete_student(labels[choice])
-            st.rerun()
+    
