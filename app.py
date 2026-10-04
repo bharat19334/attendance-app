@@ -155,23 +155,23 @@ total, present = db.today_stats(now.strftime("%Y-%m-%d"))
 counts = db.student_counts()
 
 st.title("🎓 Classroom Attendance")
-st.caption("Face recognition se class ki attendance, aur Excel report apne aap.")
+st.caption("Class attendance and Excel reports generated automatically via face recognition.")
 
 c1, c2, c3 = st.columns(3)
 c1.metric("👥 Registered students", sum(c["students"] for c in counts))
-c2.metric("📋 Aaj ke records", total)
-c3.metric("✅ Aaj present", present)
+c2.metric("📋 Today's records", total)
+c3.metric("✅ Today present", present)
 
 st.divider()
 
 left, right = st.columns([3, 2])
 with left:
-    st.subheader("📖 Kaise use karna hai")
+    st.subheader("📖 How to use")
     st.markdown(
         """
-1. **Register Student**: naam, roll no., branch/year/section bharo aur 3-5 face photos do (sirf ek baar).
-2. **Take Attendance**: class chuno, classroom ki photo lo ya upload karo. Timetable se period apne aap lag jata hai.
-3. **Reports**: mahine ki Excel file download karo. Wo `exports/` folder mein har attendance ke baad apne aap update bhi hoti hai.
+1. **Register Student**: Fill in the name, roll no., branch/year/section and provide 3-5 face photos (only once).
+2. **Take Attendance**: Select the class, take or upload a classroom photo. The period is automatically assigned from the timetable.
+3. **Reports**: Download the monthly Excel file. It is also automatically updated in the exports/ folder after every attendance.
 """
     )
     st.markdown("##### 🚀 Quick links")
@@ -188,5 +188,5 @@ with right:
             width="stretch",
         )
     else:
-        st.info("Abhi koi student registered nahi hai. Pehle Register Student page par jao.")
+        st.info("No students registered yet. Please go to the Register Student page.")
     st.caption(f"🕒 {now.strftime('%A, %d %b %Y, %H:%M')}")
