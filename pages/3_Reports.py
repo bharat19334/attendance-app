@@ -25,12 +25,12 @@ month = c4.selectbox("Month", months, key="rep_month")
 
 df = excel_report.month_dataframe(branch, year, section, month)
 if df is None:
-    st.info("Is class aur month ke liye abhi koi attendance nahi hai.")
+    st.info("there is no data for the selected class and month.")
 else:
     st.dataframe(df, hide_index=True, width="stretch")
     short = df[df["Attendance %"] < 75]
     if len(short):
-        st.warning(f"{len(short)} students ki attendance 75% se kam hai (Excel mein laal dikhti hai).")
+        st.warning(f"{len(short)} students have attendance less than 75% (Excel mein laal dikhti hai).")
     st.download_button(
         "Download Excel",
         data=excel_report.build_workbook(branch, year, section, month),
@@ -39,4 +39,4 @@ else:
         type="primary",
     )
 
-st.caption(f"Har attendance ke baad Excel file apne aap yahan bhi save hoti hai: {EXPORT_DIR}")
+st.caption(f"after every attendance the excel file is saved here: {EXPORT_DIR}")

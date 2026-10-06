@@ -20,20 +20,20 @@ branch = c1.selectbox("Branch", BRANCHES, key="att_branch")
 year = c2.selectbox("Year", YEARS, key="att_year")
 section = c3.selectbox("Section", SECTIONS, key="att_section")
 roster = db.list_students(branch, year, section, with_embeddings=True)
-st.caption(f"{now.strftime('%A, %d %b %Y, %H:%M')} | Is class mein {len(roster)} students registered hain.")
+st.caption(f"{now.strftime('%A, %d %b %Y, %H:%M')} | In this class {len(roster)} students are registered.")
 
 # --------------------------------------------------------------- 2. period
 st.subheader("Period")
-mode = st.radio("Period kaise chunna hai", ["Timetable se auto", "Manual"], horizontal=True, key="att_mode")
+mode = st.radio("how to choice a period", [" auto from timetable", "Manual"], horizontal=True, key="att_mode")
 subject = period = ""
 
 if mode == "Timetable se auto":
     current = timetable.current_period(branch, year, section, now)
     if current:
         subject, period = current["subject"], current["label"]
-        st.success(f"Abhi chal raha hai: {subject} ({period})")
+        st.success(f"it's going on: {subject} ({period})")
     else:
-        st.warning("Abhi timetable mein koi period nahi chal raha. Manual mode chuno.")
+        st.warning("period is not available in timetable. choose manually mode.")
 else:
     todays = timetable.periods_for(branch, year, section, now)
     options = {f"{p['label']} - {p['subject']}": p for p in todays}
@@ -48,21 +48,21 @@ else:
 st.subheader("Classroom photo")
 tab_up, tab_cam = st.tabs(["Photo upload", "Camera"])
 with tab_up:
-    uploaded = st.file_uploader("Classroom ki photo", type=["jpg", "jpeg", "png"], key="att_upload")
+    uploaded = st.file_uploader("photo of classroom", type=["jpg", "jpeg", "png"], key="att_upload")
 with tab_cam:
-    shot = st.camera_input("Classroom ki photo", key="att_cam")
+    shot = st.camera_input("photo of classroom", key="att_cam")
 photo = uploaded or shot
 
 with st.expander("Settings (zarurat ho toh)"):
-    tolerance = st.slider("Match strictness (chhota = strict)", 0.35, 0.70, DEFAULT_TOLERANCE, 0.01, key="att_tol")
-    upsample = st.slider("Chhote chehre dhoondhne ke liye zoom (zyada = slow)", 1, 3, 1, key="att_ups")
+    tolerance = st.slider("Match strictness (small = strict)", 0.35, 0.70, DEFAULT_TOLERANCE, 0.01, key="att_tol")
+    upsample = st.slider("zoom for small face recognition (more = slow)", 1, 3, 1, key="att_ups")
 
 if not roster:
-    st.error("Is class mein koi student registered nahi hai. Pehle Register Student page par jao.")
+    st.error("in this class no students are registered. first go to the register students page.")
 
 ready = bool(roster and subject and period and photo)
 if st.button("Mark attendance", type="primary", disabled=not ready):
-    with st.spinner("Chehre pehchane ja rahe hain..."):
+    with st.spinner("face is being recognized..."):
         try:
             result = face_engine.recognize_faces(photo.getvalue(), roster, tolerance, upsample)
         except ValueError as exc:
@@ -75,9 +75,9 @@ if st.button("Mark attendance", type="primary", disabled=not ready):
             from core import google_sheet
             rows = db.session_rows(branch, year, section, today, period)
             n = google_sheet.sync_attendance(rows, subject, period, today)
-            st.toast(f"✅ {n} rows Google Sheet mein save hui", icon="📊")
+            st.toast(f"✅ {n} row saved to Google Sheet", icon="📊")
         except FileNotFoundError:
-            st.warning("Google Sheet sync skip — credentials.json nahi mili.")
+            st.warning("Google Sheet sync skip — I couldn't find the credentials.json file.")
         except Exception as e:
             st.warning(f"Google Sheet sync fail: {e}")
             
@@ -111,17 +111,16 @@ if r:
     m4.metric("Unknown chehre", r["unknown"])
 
     if r["export_error"]:
-        st.warning("Excel file update nahi hui (shayad wo Excel mein khuli hai). Band karke Reports page se download karo.")
+        st.warning("The Excel file didn't update (maybe it's open in Excel). Close it and download it from the Reports page")
     if r["unknown"]:
-        st.warning(f"{r['unknown']} chehre kisi registered student se match nahi hue. "
-                   "Neeche table mein status khud theek kar sakte ho.")
+        st.warning(f"{r['unknown']} The face did not match any registered student. You can correct the status in the table below yourself.")
 
-    st.image(r["annotated"], caption="Hara = pehchana gaya, laal = unknown", width="stretch")
+    st.image(r["annotated"], caption="Hara = Recognized laal = unknown", width="stretch")
 
     df = pd.DataFrame(
         [{"student_id": x["student_id"], "Roll No": x["roll_no"], "Name": x["name"], "Status": x["status"]} for x in rows]
     )
-    st.markdown("**Galti ho toh Status badlo, phir Save corrections dabao.**")
+    st.markdown("**If there's an error, change the status and then click Save corrections.**")
     edited = st.data_editor(
         df,
         key=f"att_editor_{ss.att_editor_n}",
@@ -145,5 +144,5 @@ if r:
         except OSError:
             pass
         ss.att_editor_n += 1
-        ss.att_msg = f"{changed} changes save ho gaye." if changed else "Koi change nahi tha."
+        ss.att_msg = f"{changed} changes saved." if changed else "No changes were made."
         st.rerun()
