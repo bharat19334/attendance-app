@@ -25,6 +25,12 @@ def _models():
     return detector, predictor, encoder
 
 
+def match_percent(distance: float, tolerance: float = 0.55) -> int:
+    """dlib distance -> match % (0 distance = 100%, tolerance par 50%). Smooth curve."""
+    pct = 100.0 - 50.0 * (distance / tolerance) ** 2
+    return int(round(max(0.0, min(100.0, pct))))
+
+
 def decode_image(data: bytes, max_side: int = 1600) -> np.ndarray:
     """Bytes -> RGB image (bahut badi photo ko chhota karke, taaki tez chale)."""
     bgr = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
@@ -111,7 +117,9 @@ def recognize_faces(data: bytes, roster: list[dict], tolerance: float = 0.55, up
     font_scale = max(0.5, w / 1800)
     for i, r in enumerate(rects):
         if i in owner:
-            label, color = str(roster[owner[i][0]]["roll_no"]), GREEN
+            j, d = owner[i]
+            label = f'{roster[j]["name"]} {match_percent(d, tolerance)}%'
+            color = GREEN
         else:
             label, color = "Unknown", RED
         label = label.encode("ascii", "ignore").decode() or "?"
@@ -123,9 +131,11 @@ def recognize_faces(data: bytes, roster: list[dict], tolerance: float = 0.55, up
                     font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
     matched = {roster[j]["id"]: d for j, d in owner.values()}
+    confidence = {roster[j]["id"]: match_percent(d, tolerance) for j, d in owner.values()}
     return {
         "n_faces": len(rects),
         "matched": matched,
+        "confidence": confidence,
         "unknown": len(rects) - len(owner),
         "annotated": annotated,
     }
