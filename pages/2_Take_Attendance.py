@@ -27,7 +27,7 @@ st.subheader("Period")
 mode = st.radio("how to choice a period", [" auto from timetable", "Manual"], horizontal=True, key="att_mode")
 subject = period = ""
 
-if mode == "Timetable se auto":
+if mode == " auto from timetable":
     current = timetable.current_period(branch, year, section, now)
     if current:
         subject, period = current["subject"], current["label"]
@@ -115,7 +115,7 @@ if r:
     if r["unknown"]:
         st.warning(f"{r['unknown']} The face did not match any registered student. You can correct the status in the table below yourself.")
 
-    st.image(r["annotated"], caption="Hara = Recognized laal = unknown", width="stretch")
+    st.image(r["annotated"], caption="Hara = Recognized (Name + match %), laal = Unknown", width="stretch")
 
     df = pd.DataFrame(
         [{"student_id": x["student_id"], "Roll No": x["roll_no"], "Name": x["name"], "Status": x["status"]} for x in rows]
