@@ -12,7 +12,7 @@ db.init_db()
 
 # ---------------------------------------------------------------- THEME
 ss = st.session_state
-ss.setdefault("theme", "light")
+ss.theme = "dark"  # permanent dark theme
 
 
 def apply_theme():
@@ -137,17 +137,7 @@ with st.sidebar:
     st.markdown("### 🎓 Attendance System")
     st.markdown("---")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("☀️ Light", use_container_width=True, disabled=(ss.theme == "light")):
-            ss.theme = "light"
-            st.rerun()
-    with col2:
-        if st.button("🌙 Dark", use_container_width=True, disabled=(ss.theme == "dark")):
-            ss.theme = "dark"
-            st.rerun()
-
-    st.markdown("---")
+    # (Light/Dark toggle hata diya - theme permanent dark hai)
 
 # ---------------------------------------------------------------- MAIN
 now = timetable.now_ist()
