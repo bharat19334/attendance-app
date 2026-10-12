@@ -1,141 +1,182 @@
-"""Chehra detect + pehchaan (dlib). Koi internet ya extra download nahi chahiye."""
-from __future__ import annotations
+import streamlit as st
 
-import importlib.util
-import os
-from functools import lru_cache
+from core import db, timetable
 
-import cv2
-import dlib
-import numpy as np
+st.set_page_config(
+    page_title="Classroom Attendance",
+    page_icon="🎓",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+db.init_db()
 
-GREEN = (22, 163, 74)
-RED = (220, 38, 38)
-
-
-@lru_cache(maxsize=1)
-def _models():
-    spec = importlib.util.find_spec("face_recognition_models")
-    if spec is None or not spec.submodule_search_locations:
-        raise RuntimeError("face_recognition_models install nahi hai. `pip install -r requirements.txt` chalao.")
-    folder = os.path.join(list(spec.submodule_search_locations)[0], "models")
-    detector = dlib.get_frontal_face_detector()
-    predictor = dlib.shape_predictor(os.path.join(folder, "shape_predictor_68_face_landmarks.dat"))
-    encoder = dlib.face_recognition_model_v1(os.path.join(folder, "dlib_face_recognition_resnet_model_v1.dat"))
-    return detector, predictor, encoder
+# ---------------------------------------------------------------- THEME
+ss = st.session_state
+ss.theme = "dark"  # permanent dark theme
 
 
-def match_percent(distance: float, tolerance: float = 0.55) -> int:
-    """dlib distance -> match % (0 distance = 100%, tolerance par 50%). Smooth curve."""
-    pct = 100.0 - 50.0 * (distance / tolerance) ** 2
-    return int(round(max(0.0, min(100.0, pct))))
+def apply_theme():
+    """Dark/Light mode CSS + custom styling."""
+    if ss.theme == "dark":
+        bg = "#0F172A"
+        card_bg = "#1E293B"
+        text = "#F1F5F9"
+        subtext = "#94A3B8"
+        border = "#334155"
+        accent = "#14B8A6"
+    else:
+        bg = "#F8FAFC"
+        card_bg = "#FFFFFF"
+        text = "#0F172A"
+        subtext = "#64748B"
+        border = "#E2E8F0"
+        accent = "#0F766E"
+
+    st.markdown(f"""
+    <style>
+    .stApp {{
+        background-color: {bg};
+        color: {text};
+    }}
+    [data-testid="stSidebar"] {{
+        background-color: {card_bg};
+        border-right: 1px solid {border};
+    }}
+    [data-testid="stSidebar"] * {{
+        color: {text} !important;
+    }}
+    h1, h2, h3, h4 {{
+        color: {text} !important;
+        font-weight: 700 !important;
+    }}
+    [data-testid="stMetric"] {{
+        background-color: {card_bg};
+        border: 1px solid {border};
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }}
+    [data-testid="stMetricLabel"] {{
+        color: {subtext} !important;
+        font-size: 0.875rem !important;
+    }}
+    [data-testid="stMetricValue"] {{
+        color: {accent} !important;
+        font-size: 2rem !important;
+    }}
+    .stButton > button {{
+        background-color: {accent};
+        color: white;
+        border-radius: 8px;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.2s;
+    }}
+    .stButton > button:hover {{
+        opacity: 0.9;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }}
+    .stTextInput input, .stSelectbox select, .stNumberInput input {{
+        background-color: {card_bg} !important;
+        color: {text} !important;
+        border-radius: 8px !important;
+        border: 1px solid {border} !important;
+    }}
+    [data-testid="stDataFrame"] {{
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid {border};
+    }}
+    .stAlert {{
+        border-radius: 10px;
+    }}
+    [data-testid="stPageLink"] a {{
+        background-color: {card_bg};
+        border: 1px solid {border};
+        border-radius: 10px;
+        padding: 12px 16px;
+        color: {text} !important;
+        text-decoration: none;
+        transition: all 0.2s;
+        display: block;
+        font-weight: 500;
+    }}
+    [data-testid="stPageLink"] a:hover {{
+        border-color: {accent};
+        transform: translateX(4px);
+    }}
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 8px;
+        background-color: {card_bg};
+        padding: 6px;
+        border-radius: 10px;
+        border: 1px solid {border};
+    }}
+    .stTabs [data-baseweb="tab"] {{
+        border-radius: 8px;
+        padding: 8px 16px;
+        color: {subtext};
+    }}
+    .stTabs [aria-selected="true"] {{
+        background-color: {accent} !important;
+        color: white !important;
+    }}
+    hr {{
+        border-color: {border} !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
 
-def decode_image(data: bytes, max_side: int = 1600) -> np.ndarray:
-    """Bytes -> RGB image (bahut badi photo ko chhota karke, taaki tez chale)."""
-    bgr = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
-    if bgr is None:
-        raise ValueError("Photo read nahi ho payi. JPG ya PNG photo use karo.")
-    h, w = bgr.shape[:2]
-    scale = max_side / max(h, w)
-    if scale < 1:
-        bgr = cv2.resize(bgr, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-    return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+apply_theme()
 
+# ---------------------------------------------------------------- SIDEBAR
+with st.sidebar:
+    st.markdown("### 🎓 Attendance System")
+    st.markdown("---")
 
-def _detect(img: np.ndarray, upsample: int) -> list:
-    detector, _, _ = _models()
-    h, w = img.shape[:2]
-    rects = []
-    for r in detector(img, upsample):
-        rects.append(
-            dlib.rectangle(max(0, r.left()), max(0, r.top()), min(w - 1, r.right()), min(h - 1, r.bottom()))
+    # (Light/Dark toggle hata diya - theme permanent dark hai)
+
+# ---------------------------------------------------------------- MAIN
+now = timetable.now_ist()
+total, present = db.today_stats(now.strftime("%Y-%m-%d"))
+counts = db.student_counts()
+
+st.title("🎓 Classroom Attendance")
+st.caption("Class attendance and Excel reports generated automatically via face recognition.")
+
+c1, c2, c3 = st.columns(3)
+c1.metric("👥 Registered students", sum(c["students"] for c in counts))
+c2.metric("📋 Today's records", total)
+c3.metric("✅ Today present", present)
+
+st.divider()
+
+left, right = st.columns([3, 2])
+with left:
+    st.subheader("📖 How to use")
+    st.markdown(
+        """
+1. **Register Student**: Fill in the name, roll no., branch/year/section and provide 3-5 face photos (only once).
+2. **Take Attendance**: Select the class, take or upload a classroom photo. The period is automatically assigned from the timetable.
+3. **Reports**: Download the monthly Excel file. It is also automatically updated in the exports/ folder after every attendance.
+"""
+    )
+    st.markdown("##### 🚀 Quick links")
+    st.page_link("pages/1_Register_Student.py", label="👤 Register Student")
+    st.page_link("pages/2_Take_Attendance.py", label="📸 Take Attendance")
+    st.page_link("pages/3_Reports.py", label="📊 Reports")
+
+with right:
+    st.subheader("🏫 Registered classes")
+    if counts:
+        st.dataframe(
+            [{"Branch": c["branch"], "Year": c["year"], "Section": c["section"], "Students": c["students"]} for c in counts],
+            hide_index=True,
+            width="stretch",
         )
-    return rects
-
-
-def _encode(img: np.ndarray, rect, jitters: int = 1) -> np.ndarray:
-    _, predictor, encoder = _models()
-    shape = predictor(img, rect)
-    return np.array(encoder.compute_face_descriptor(img, shape, jitters), dtype=np.float64)
-
-
-def _area(r) -> int:
-    return max(0, r.right() - r.left()) * max(0, r.bottom() - r.top())
-
-
-def encode_registration_photo(data: bytes) -> tuple[np.ndarray | None, str | None]:
-    """Registration photo se ek embedding. (embedding, None) ya (None, error message)."""
-    try:
-        img = decode_image(data, max_side=1600)
-    except ValueError as exc:
-        return None, str(exc)
-
-    rects = _detect(img, 1) or _detect(img, 2)
-    if not rects:
-        return None, "Chehra nahi mila. Roshni mein, seedha camera ki taraf dekhkar photo lo."
-    rects.sort(key=_area, reverse=True)
-    if len(rects) > 1 and _area(rects[0]) < 3 * _area(rects[1]):
-        return None, "Photo mein ek se zyada chehre hain. Sirf ek student ki photo lo."
-    return _encode(img, rects[0], jitters=3), None
-
-
-def recognize_faces(data: bytes, roster: list[dict], tolerance: float = 0.55, upsample: int = 1) -> dict:
-    """Classroom photo mein chehre dhoondo aur class ke students se match karo.
-
-    roster: [{"id", "roll_no", "name", "embeddings": [[128 numbers], ...]}, ...]
-    Return: n_faces, matched {student_id: distance}, unknown (count), annotated (RGB image)
-    """
-    img = decode_image(data, max_side=2400)
-    rects = _detect(img, upsample)
-    encodings = [_encode(img, r) for r in rects]
-
-    # Har (chehra, student) jodi ki doori; sabse paas wali jodi pehle assign hoti hai,
-    # taaki ek student ek hi chehre se match ho.
-    pairs: list[tuple[float, int, int]] = []
-    if encodings and roster:
-        faces = np.stack(encodings)
-        for j, student in enumerate(roster):
-            emb = np.asarray(student["embeddings"], dtype=np.float64)
-            dist = np.linalg.norm(faces[:, None, :] - emb[None, :, :], axis=2).min(axis=1)
-            for i, d in enumerate(dist):
-                if d <= tolerance:
-                    pairs.append((float(d), i, j))
-    pairs.sort()
-
-    owner: dict[int, tuple[int, float]] = {}
-    taken: set[int] = set()
-    for d, i, j in pairs:
-        if i in owner or j in taken:
-            continue
-        owner[i] = (j, d)
-        taken.add(j)
-
-    annotated = img.copy()
-    h, w = annotated.shape[:2]
-    thickness = max(2, w // 600)
-    font_scale = max(0.5, w / 1800)
-    for i, r in enumerate(rects):
-        if i in owner:
-            j, d = owner[i]
-            label = f'{match_percent(d, tolerance)}% {roster[j]["name"]}'
-            color = GREEN
-        else:
-            label, color = "Unknown", RED
-        label = label.encode("ascii", "ignore").decode() or "?"
-        cv2.rectangle(annotated, (r.left(), r.top()), (r.right(), r.bottom()), color, thickness)
-        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
-        y0 = max(0, r.top() - th - 8)
-        cv2.rectangle(annotated, (r.left(), y0), (r.left() + tw + 8, y0 + th + 8), color, -1)
-        cv2.putText(annotated, label, (r.left() + 4, y0 + th + 2), cv2.FONT_HERSHEY_SIMPLEX,
-                    font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
-
-    matched = {roster[j]["id"]: d for j, d in owner.values()}
-    confidence = {roster[j]["id"]: match_percent(d, tolerance) for j, d in owner.values()}
-    return {
-        "n_faces": len(rects),
-        "matched": matched,
-        "confidence": confidence,
-        "unknown": len(rects) - len(owner),
-        "annotated": annotated,
-    }
+    else:
+        st.info("No students registered yet. Please go to the Register Student page.")
+    st.caption(f"🕒 {now.strftime('%A, %d %b %Y, %H:%M')}")
